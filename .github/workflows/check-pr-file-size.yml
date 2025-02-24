@@ -1,8 +1,20 @@
 name: Check PR File Size
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+    workflow_call:
+        inputs:
+          file_size_limit_mb:
+            # "Maximum allowed total size of changed files in MB"
+            required: false
+            default: '50'
+            type: string
+
+          large_file_allowlist:
+            # "List of files to allowlist (ignore size check), one file per line"
+            required: false
+            default: '' # Default empty allowlist
+            type: string
+
 
 jobs:
   check_file_size:
@@ -18,30 +30,39 @@ jobs:
       - name: Get changed files
         id: changed-files
         run: |
-          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }})
+          git fetch --no-tags --prune --no-recurse-submodules --depth=$((${{ github.event.pull_request.commits }} + 1)) origin ${{ github.event.pull_request.head.sha }}
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
           echo "CHANGED_FILES<<EOF" >> "$GITHUB_OUTPUT"
           echo "$CHANGED_FILES" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
-      - name: Calculate total size of changed files (excluding whitelisted)
+      - name: Calculate total size of changed files (excluding allowlisted)
         id: calculate-size
         env:
-          FILE_SIZE_WHITELIST: ${{ inputs.file_whitelist }} # Get whitelist input
+          FILE_SIZE_allowlist: ${{ inputs.large_file_allowlist }} # Get allowlist input
         run: |
+          if [ -f "$FILE_SIZE_allowlist" ]; then
+            FILE_SIZE_allowlist_CONTENT=$(< "$FILE_SIZE_allowlist")
+          else
+            FILE_SIZE_allowlist_CONTENT=""
+          fi
           TOTAL_SIZE_BYTES=0
-          WHITELIST_FILES=(${FILE_SIZE_WHITELIST//$'\n'/ }) # Convert multiline string to array
+          allowlist_FILES=(${FILE_SIZE_allowlist//$'\n'/ }) # Convert multiline string to array
           IFS=$'\n'
-          for file in ${{ steps.changed-files.outputs.CHANGED_FILES }}; do
+          CHANGED_FILES_MULTILINE="${{ steps.changed-files.outputs.CHANGED_FILES }}"
+          CHANGED_FILES=($(echo "$CHANGED_FILES_MULTILINE")) # Important: Use command substitution with echo
+          for file in "${CHANGED_FILES[@]}"; do
+            ls -la "$file"
             if [ -n "$file" ]; then
-              IS_WHITELISTED=false
-              for whitelisted_file in "${WHITELIST_FILES[@]}"; do
-                if [ "$file" = "$whitelisted_file" ]; then
-                  IS_WHITELISTED=true
-                  echo "File '$file' is whitelisted, skipping size check."
-                  break # No need to check other whitelist entries for this file
+              IS_allowlistED=false
+              for allowlisted_file in "${allowlist_FILES[@]}"; do
+                if [ "$file" = "$allowlisted_file" ]; then
+                  IS_allowlistED=true
+                  echo "File '$file' is allowlisted, skipping size check."
+                  break # No need to check other allowlist entries for this file
                 fi
               done
-              if ! $IS_WHITELISTED; then
+              if ! $IS_allowlistED; then
                 FILE_SIZE_BYTES=$(stat -c %s "$file")
                 TOTAL_SIZE_BYTES=$((TOTAL_SIZE_BYTES + FILE_SIZE_BYTES))
               fi
@@ -58,21 +79,11 @@ jobs:
           TOTAL_SIZE_BYTES=${{ steps.calculate-size.outputs.TOTAL_SIZE_BYTES }}
 
           echo "File size limit: ${{ env.FILE_SIZE_LIMIT_MB }} MB (${FILE_SIZE_LIMIT_BYTES} bytes)"
-          echo "Total changed files size (excluding whitelisted): ${TOTAL_SIZE_BYTES} bytes"
+          echo "Total changed files size (excluding allowlisted): ${TOTAL_SIZE_BYTES} bytes"
 
           if [ "$TOTAL_SIZE_BYTES" -gt "$FILE_SIZE_LIMIT_BYTES" ]; then
-            echo "::error title=PR File Size Exceeded::Total size of changed files (excluding whitelisted) (${TOTAL_SIZE_BYTES} bytes) exceeds the limit of ${{ env.FILE_SIZE_LIMIT_MB }} MB."
+            echo "::error title=PR File Size Exceeded::Total size of changed files (excluding allowlisted) (${TOTAL_SIZE_BYTES} bytes) exceeds the limit of ${{ env.FILE_SIZE_LIMIT_MB }} MB."
             exit 1 # Fail the action
           else
             echo "::notice title=PR File Size Check::Total size of changed files is within the limit."
           fi
-
-inputs:
-  file_size_limit_mb:
-    description: "Maximum allowed total size of changed files in MB"
-    required: false
-    default: '50'
-  file_whitelist:
-    description: "List of files to whitelist (ignore size check), one file per line"
-    required: false
-    default: '' # Default empty whitelist
