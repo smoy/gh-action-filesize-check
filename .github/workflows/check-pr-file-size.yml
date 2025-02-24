@@ -39,8 +39,10 @@ jobs:
       - name: Calculate total size of changed files (excluding allowlisted)
         id: calculate-size
         env:
+          FILE_SIZE_LIMIT_MB: ${{ inputs.file_size_limit_mb || 50 }} # Default limit 50MB, configurable via workflow inputs
           FILE_SIZE_allowlist: ${{ inputs.large_file_allowlist }} # Get allowlist input
         run: |
+          FILE_SIZE_LIMIT_BYTES=$(( ${{ env.FILE_SIZE_LIMIT_MB }} * 1024 * 1024 )) # Convert MB to bytes
           if [ -f "$FILE_SIZE_allowlist" ]; then
             FILE_SIZE_allowlist_CONTENT=$(< "$FILE_SIZE_allowlist")
           else
@@ -51,6 +53,7 @@ jobs:
           IFS=$'\n'
           CHANGED_FILES_MULTILINE="${{ steps.changed-files.outputs.CHANGED_FILES }}"
           CHANGED_FILES=($(echo "$CHANGED_FILES_MULTILINE")) # Important: Use command substitution with echo
+          RETURN_CODE = 0
           for file in "${CHANGED_FILES[@]}"; do
             ls -la "$file"
             if [ -n "$file" ]; then
@@ -64,26 +67,15 @@ jobs:
               done
               if ! $IS_allowlistED; then
                 FILE_SIZE_BYTES=$(stat -c %s "$file")
-                TOTAL_SIZE_BYTES=$((TOTAL_SIZE_BYTES + FILE_SIZE_BYTES))
+
+                if [ "$FILE_SIZE_BYTES" -gt "$FILE_SIZE_LIMIT_BYTES" ]; then
+                    echo "::error title=PR File Size Exceeded:: ${file} (excluding allowlisted) (${FILE_SIZE_BYTES} bytes) exceeds the limit of ${{ env.FILE_SIZE_LIMIT_MB }} MB."
+                    RETURN_CODE=1 # Fail the action
+                else
+                    echo "::notice title=PR File Size Check::Total size of changed files is within the limit."
+                fi
+
               fi
             fi
           done
-          echo "TOTAL_SIZE_BYTES=$TOTAL_SIZE_BYTES" >> "$GITHUB_OUTPUT"
-
-      - name: Check file size limit
-        id: check-limit
-        env:
-          FILE_SIZE_LIMIT_MB: ${{ inputs.file_size_limit_mb || 50 }} # Default limit 50MB, configurable via workflow inputs
-        run: |
-          FILE_SIZE_LIMIT_BYTES=$(( ${{ env.FILE_SIZE_LIMIT_MB }} * 1024 * 1024 )) # Convert MB to bytes
-          TOTAL_SIZE_BYTES=${{ steps.calculate-size.outputs.TOTAL_SIZE_BYTES }}
-
-          echo "File size limit: ${{ env.FILE_SIZE_LIMIT_MB }} MB (${FILE_SIZE_LIMIT_BYTES} bytes)"
-          echo "Total changed files size (excluding allowlisted): ${TOTAL_SIZE_BYTES} bytes"
-
-          if [ "$TOTAL_SIZE_BYTES" -gt "$FILE_SIZE_LIMIT_BYTES" ]; then
-            echo "::error title=PR File Size Exceeded::Total size of changed files (excluding allowlisted) (${TOTAL_SIZE_BYTES} bytes) exceeds the limit of ${{ env.FILE_SIZE_LIMIT_MB }} MB."
-            exit 1 # Fail the action
-          else
-            echo "::notice title=PR File Size Check::Total size of changed files is within the limit."
-          fi
+          exit $RETURN_CODE
