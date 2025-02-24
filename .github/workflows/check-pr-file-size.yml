@@ -1,0 +1,78 @@
+name: Check PR File Size
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  check_file_size:
+    runs-on: ubuntu-latest
+
+    permissions:
+      pull-requests: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get changed files
+        id: changed-files
+        run: |
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }})
+          echo "CHANGED_FILES<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$CHANGED_FILES" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Calculate total size of changed files (excluding whitelisted)
+        id: calculate-size
+        env:
+          FILE_SIZE_WHITELIST: ${{ inputs.file_whitelist }} # Get whitelist input
+        run: |
+          TOTAL_SIZE_BYTES=0
+          WHITELIST_FILES=(${FILE_SIZE_WHITELIST//$'\n'/ }) # Convert multiline string to array
+          IFS=$'\n'
+          for file in ${{ steps.changed-files.outputs.CHANGED_FILES }}; do
+            if [ -n "$file" ]; then
+              IS_WHITELISTED=false
+              for whitelisted_file in "${WHITELIST_FILES[@]}"; do
+                if [ "$file" = "$whitelisted_file" ]; then
+                  IS_WHITELISTED=true
+                  echo "File '$file' is whitelisted, skipping size check."
+                  break # No need to check other whitelist entries for this file
+                fi
+              done
+              if ! $IS_WHITELISTED; then
+                FILE_SIZE_BYTES=$(stat -c %s "$file")
+                TOTAL_SIZE_BYTES=$((TOTAL_SIZE_BYTES + FILE_SIZE_BYTES))
+              fi
+            fi
+          done
+          echo "TOTAL_SIZE_BYTES=$TOTAL_SIZE_BYTES" >> "$GITHUB_OUTPUT"
+
+      - name: Check file size limit
+        id: check-limit
+        env:
+          FILE_SIZE_LIMIT_MB: ${{ inputs.file_size_limit_mb || 50 }} # Default limit 50MB, configurable via workflow inputs
+        run: |
+          FILE_SIZE_LIMIT_BYTES=$(( ${{ env.FILE_SIZE_LIMIT_MB }} * 1024 * 1024 )) # Convert MB to bytes
+          TOTAL_SIZE_BYTES=${{ steps.calculate-size.outputs.TOTAL_SIZE_BYTES }}
+
+          echo "File size limit: ${{ env.FILE_SIZE_LIMIT_MB }} MB (${FILE_SIZE_LIMIT_BYTES} bytes)"
+          echo "Total changed files size (excluding whitelisted): ${TOTAL_SIZE_BYTES} bytes"
+
+          if [ "$TOTAL_SIZE_BYTES" -gt "$FILE_SIZE_LIMIT_BYTES" ]; then
+            echo "::error title=PR File Size Exceeded::Total size of changed files (excluding whitelisted) (${TOTAL_SIZE_BYTES} bytes) exceeds the limit of ${{ env.FILE_SIZE_LIMIT_MB }} MB."
+            exit 1 # Fail the action
+          else
+            echo "::notice title=PR File Size Check::Total size of changed files is within the limit."
+          fi
+
+inputs:
+  file_size_limit_mb:
+    description: "Maximum allowed total size of changed files in MB"
+    required: false
+    default: '50'
+  file_whitelist:
+    description: "List of files to whitelist (ignore size check), one file per line"
+    required: false
+    default: '' # Default empty whitelist
