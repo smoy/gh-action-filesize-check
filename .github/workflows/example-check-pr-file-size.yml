@@ -1,0 +1,12 @@
+name: Check PR File Size
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+    call-check-pr-file-size-in-local-repo:
+        uses: ./.github/workflows/check-pr-file-size.yml
+        with:
+            file_size_limit_mb: 5
+            large_file_allowlist: large-file-size-allowlist.txt

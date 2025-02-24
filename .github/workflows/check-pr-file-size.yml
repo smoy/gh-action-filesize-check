@@ -1,8 +1,20 @@
 name: Check PR File Size
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+    workflow_call:
+        inputs:
+          file_size_limit_mb:
+            # "Maximum allowed total size of changed files in MB"
+            required: false
+            default: '50'
+            type: string
+
+          file_whitelist:
+            # "List of files to whitelist (ignore size check), one file per line"
+            required: false
+            default: '' # Default empty whitelist
+            type: string
+
 
 jobs:
   check_file_size:
@@ -29,7 +41,13 @@ jobs:
         env:
           FILE_SIZE_WHITELIST: ${{ inputs.file_whitelist }} # Get whitelist input
         run: |
+          if [ -f "$FILE_SIZE_WHITELIST" ]; then
+            FILE_SIZE_WHITELIST_CONTENT=$(< "$FILE_SIZE_WHITELIST")
+          else
+            FILE_SIZE_WHITELIST_CONTENT=""
+          fi
           ls -la .
+          echo FILE_SIZE_WHITELIST_CONTENT "$FILE_SIZE_WHITELIST_CONTENT"
           TOTAL_SIZE_BYTES=0
           WHITELIST_FILES=(${FILE_SIZE_WHITELIST//$'\n'/ }) # Convert multiline string to array
           IFS=$'\n'
@@ -57,7 +75,7 @@ jobs:
       - name: Check file size limit
         id: check-limit
         env:
-          FILE_SIZE_LIMIT_MB: ${{ inputs.file_size_limit_mb || 5 }} # Default limit 5MB, configurable via workflow inputs
+          FILE_SIZE_LIMIT_MB: ${{ inputs.file_size_limit_mb || 50 }} # Default limit 50MB, configurable via workflow inputs
         run: |
           FILE_SIZE_LIMIT_BYTES=$(( ${{ env.FILE_SIZE_LIMIT_MB }} * 1024 * 1024 )) # Convert MB to bytes
           TOTAL_SIZE_BYTES=${{ steps.calculate-size.outputs.TOTAL_SIZE_BYTES }}
@@ -76,7 +94,7 @@ jobs:
 #   file_size_limit_mb:
 #     description: "Maximum allowed total size of changed files in MB"
 #     required: false
-#     default: '5'
+#     default: '50'
 #   file_whitelist:
 #     description: "List of files to whitelist (ignore size check), one file per line"
 #     required: false
