@@ -55,7 +55,6 @@ jobs:
           CHANGED_FILES=($(echo "$CHANGED_FILES_MULTILINE")) # Important: Use command substitution with echo
           RETURN_CODE=0
           for file in "${CHANGED_FILES[@]}"; do
-            ls -la "$file"
             if [ -n "$file" ]; then
               IS_allowlistED=false
               for allowlisted_file in "${allowlist_FILES[@]}"; do
