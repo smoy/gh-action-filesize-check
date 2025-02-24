@@ -31,8 +31,9 @@ jobs:
         run: |
           TOTAL_SIZE_BYTES=0
           WHITELIST_FILES=(${FILE_SIZE_WHITELIST//$'\n'/ }) # Convert multiline string to array
+          CHANGED_FILES=(${${{ steps.changed-files.outputs.CHANGED_FILES }}//$'\n'/ }) # Convert multiline string to array
           IFS=$'\n'
-          for file in ${{ steps.changed-files.outputs.CHANGED_FILES }}; do
+          for file in "${CHANGED_FILES[@]}"; do
             if [ -n "$file" ]; then
               IS_WHITELISTED=false
               for whitelisted_file in "${WHITELIST_FILES[@]}"; do
