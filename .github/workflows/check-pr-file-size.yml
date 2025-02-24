@@ -49,7 +49,7 @@ jobs:
             FILE_SIZE_allowlist_CONTENT=""
           fi
           TOTAL_SIZE_BYTES=0
-          allowlist_FILES=(${FILE_SIZE_allowlist//$'\n'/ }) # Convert multiline string to array
+          allowlist_FILES=(${FILE_SIZE_allowlist_CONTENT//$'\n'/ }) # Convert multiline string to array
           IFS=$'\n'
           CHANGED_FILES_MULTILINE="${{ steps.changed-files.outputs.CHANGED_FILES }}"
           CHANGED_FILES=($(echo "$CHANGED_FILES_MULTILINE")) # Important: Use command substitution with echo
