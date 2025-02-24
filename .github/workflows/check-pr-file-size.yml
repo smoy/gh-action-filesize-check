@@ -33,7 +33,8 @@ jobs:
           TOTAL_SIZE_BYTES=0
           WHITELIST_FILES=(${FILE_SIZE_WHITELIST//$'\n'/ }) # Convert multiline string to array
           IFS=$'\n'
-          CHANGED_FILES="${{ steps.changed-files.outputs.CHANGED_FILES }}"
+          CHANGED_FILES_MULTILINE="${{ steps.changed-files.outputs.CHANGED_FILES }}"
+          CHANGED_FILES=($(echo "$CHANGED_FILES_MULTILINE")) # Important: Use command substitution with echo
           for file in "${CHANGED_FILES[@]}"; do
             ls -la "$file"
             if [ -n "$file" ]; then
