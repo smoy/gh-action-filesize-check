@@ -1,8 +1,20 @@
 name: Check PR File Size
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+    workflow_call:
+        inputs:
+          file_size_limit_mb:
+            # "Maximum allowed total size of changed files in MB"
+            required: false
+            default: '50'
+            type: string
+
+          large_file_allowlist:
+            # "List of files to whitelist (ignore size check), one file per line"
+            required: false
+            default: '' # Default empty whitelist
+            type: string
+
 
 jobs:
   check_file_size:
@@ -18,7 +30,8 @@ jobs:
       - name: Get changed files
         id: changed-files
         run: |
-          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }})
+          git fetch --no-tags --prune --no-recurse-submodules --depth=$((${{ github.event.pull_request.commits }} + 1)) origin ${{ github.event.pull_request.head.sha }}
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
           echo "CHANGED_FILES<<EOF" >> "$GITHUB_OUTPUT"
           echo "$CHANGED_FILES" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
@@ -26,12 +39,22 @@ jobs:
       - name: Calculate total size of changed files (excluding whitelisted)
         id: calculate-size
         env:
-          FILE_SIZE_WHITELIST: ${{ inputs.file_whitelist }} # Get whitelist input
+          FILE_SIZE_WHITELIST: ${{ inputs.large_file_allowlist }} # Get whitelist input
         run: |
+          if [ -f "$FILE_SIZE_WHITELIST" ]; then
+            FILE_SIZE_WHITELIST_CONTENT=$(< "$FILE_SIZE_WHITELIST")
+          else
+            FILE_SIZE_WHITELIST_CONTENT=""
+          fi
+          ls -la .
+          echo FILE_SIZE_WHITELIST_CONTENT "$FILE_SIZE_WHITELIST_CONTENT"
           TOTAL_SIZE_BYTES=0
           WHITELIST_FILES=(${FILE_SIZE_WHITELIST//$'\n'/ }) # Convert multiline string to array
           IFS=$'\n'
-          for file in ${{ steps.changed-files.outputs.CHANGED_FILES }}; do
+          CHANGED_FILES_MULTILINE="${{ steps.changed-files.outputs.CHANGED_FILES }}"
+          CHANGED_FILES=($(echo "$CHANGED_FILES_MULTILINE")) # Important: Use command substitution with echo
+          for file in "${CHANGED_FILES[@]}"; do
+            ls -la "$file"
             if [ -n "$file" ]; then
               IS_WHITELISTED=false
               for whitelisted_file in "${WHITELIST_FILES[@]}"; do
@@ -67,12 +90,12 @@ jobs:
             echo "::notice title=PR File Size Check::Total size of changed files is within the limit."
           fi
 
-inputs:
-  file_size_limit_mb:
-    description: "Maximum allowed total size of changed files in MB"
-    required: false
-    default: '50'
-  file_whitelist:
-    description: "List of files to whitelist (ignore size check), one file per line"
-    required: false
-    default: '' # Default empty whitelist
+# inputs:
+#   file_size_limit_mb:
+#     description: "Maximum allowed total size of changed files in MB"
+#     required: false
+#     default: '50'
+#   large_file_allowlist:
+#     description: "List of files to whitelist (ignore size check), one file per line"
+#     required: false
+#     default: '' # Default empty whitelist
