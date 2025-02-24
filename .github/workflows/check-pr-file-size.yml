@@ -67,12 +67,12 @@ jobs:
             echo "::notice title=PR File Size Check::Total size of changed files is within the limit."
           fi
 
-inputs:
-  file_size_limit_mb:
-    description: "Maximum allowed total size of changed files in MB"
-    required: false
-    default: '5'
-  file_whitelist:
-    description: "List of files to whitelist (ignore size check), one file per line"
-    required: false
-    default: '' # Default empty whitelist
+# inputs:
+#   file_size_limit_mb:
+#     description: "Maximum allowed total size of changed files in MB"
+#     required: false
+#     default: '5'
+#   file_whitelist:
+#     description: "List of files to whitelist (ignore size check), one file per line"
+#     required: false
+#     default: '' # Default empty whitelist
