@@ -29,6 +29,7 @@ jobs:
         env:
           FILE_SIZE_WHITELIST: ${{ inputs.file_whitelist }} # Get whitelist input
         run: |
+          ls -la .
           TOTAL_SIZE_BYTES=0
           WHITELIST_FILES=(${FILE_SIZE_WHITELIST//$'\n'/ }) # Convert multiline string to array
           IFS=$'\n'
