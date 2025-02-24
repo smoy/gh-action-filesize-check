@@ -32,7 +32,7 @@ jobs:
           TOTAL_SIZE_BYTES=0
           WHITELIST_FILES=(${FILE_SIZE_WHITELIST//$'\n'/ }) # Convert multiline string to array
           IFS=$'\n'
-          IFS=$'\n' read -r -d '' -a CHANGED_FILES <<< "${{ steps.changed-files.outputs.CHANGED_FILES }}"
+          CHANGED_FILES = $(${{ steps.changed-files.outputs.CHANGED_FILES }})
           for file in "${CHANGED_FILES[@]}"; do
             if [ -n "$file" ]; then
               IS_WHITELISTED=false
