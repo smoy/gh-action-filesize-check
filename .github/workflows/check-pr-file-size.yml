@@ -52,7 +52,7 @@ jobs:
       - name: Check file size limit
         id: check-limit
         env:
-          FILE_SIZE_LIMIT_MB: ${{ inputs.file_size_limit_mb || 50 }} # Default limit 50MB, configurable via workflow inputs
+          FILE_SIZE_LIMIT_MB: ${{ inputs.file_size_limit_mb || 5 }} # Default limit 5MB, configurable via workflow inputs
         run: |
           FILE_SIZE_LIMIT_BYTES=$(( ${{ env.FILE_SIZE_LIMIT_MB }} * 1024 * 1024 )) # Convert MB to bytes
           TOTAL_SIZE_BYTES=${{ steps.calculate-size.outputs.TOTAL_SIZE_BYTES }}
@@ -71,7 +71,7 @@ inputs:
   file_size_limit_mb:
     description: "Maximum allowed total size of changed files in MB"
     required: false
-    default: '50'
+    default: '5'
   file_whitelist:
     description: "List of files to whitelist (ignore size check), one file per line"
     required: false
