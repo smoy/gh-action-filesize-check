@@ -9,7 +9,7 @@ on:
             default: '50'
             type: string
 
-          file_whitelist:
+          large_file_allowlist:
             # "List of files to whitelist (ignore size check), one file per line"
             required: false
             default: '' # Default empty whitelist
@@ -39,7 +39,7 @@ jobs:
       - name: Calculate total size of changed files (excluding whitelisted)
         id: calculate-size
         env:
-          FILE_SIZE_WHITELIST: ${{ inputs.file_whitelist }} # Get whitelist input
+          FILE_SIZE_WHITELIST: ${{ inputs.large_file_allowlist }} # Get whitelist input
         run: |
           if [ -f "$FILE_SIZE_WHITELIST" ]; then
             FILE_SIZE_WHITELIST_CONTENT=$(< "$FILE_SIZE_WHITELIST")
@@ -95,7 +95,7 @@ jobs:
 #     description: "Maximum allowed total size of changed files in MB"
 #     required: false
 #     default: '50'
-#   file_whitelist:
+#   large_file_allowlist:
 #     description: "List of files to whitelist (ignore size check), one file per line"
 #     required: false
 #     default: '' # Default empty whitelist
