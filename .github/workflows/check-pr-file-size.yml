@@ -66,7 +66,12 @@ jobs:
                 fi
               done
               if ! $IS_allowlistED; then
-                FILE_SIZE_BYTES=$(stat -c %s "$file")
+
+                if [ -f "$$file" ]; then
+                  FILE_SIZE_BYTES=$(stat -c %s "$file")
+                else
+                  FILE_SIZE_BYTES=0
+                fi
 
                 if [ "$FILE_SIZE_BYTES" -gt "$FILE_SIZE_LIMIT_BYTES" ]; then
                     echo "::error title=PR File Size Exceeded:: ${file} (excluding allowlisted) (${FILE_SIZE_BYTES} bytes) exceeds the limit of ${{ env.FILE_SIZE_LIMIT_MB }} MB."
